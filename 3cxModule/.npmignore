@@ -1,0 +1,17 @@
+# Development
+src
+test
+package-lock.json
+rollup.config.cjs
+
+# IDE
+.idea/
+.claude/
+
+# Build tools
+node_modules/
+.cache/
+
+# Misc
+*.log
+.env

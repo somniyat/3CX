@@ -1,0 +1,42 @@
+{
+  "name": "@omniyat/3cx-module",
+  "version": "1.0.0",
+  "description": "Module Node.js pour interagir avec l'API 3CX : historique d'appels, enregistrements, extensions.",
+  "type": "commonjs",
+  "main": "dist/index.cjs",
+  "exports": "./dist/index.cjs",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "rollup -c rollup.config.cjs",
+    "prepare": "npm run build",
+    "test": "node --env-file=.env src/tests/index.js"
+  },
+  "keywords": [
+    "3cx",
+    "voip",
+    "call-history",
+    "recordings",
+    "omniyat"
+  ],
+  "author": {
+    "name": "Omniyat",
+    "email": "contact@omniyat.com"
+  },
+  "license": "ISC",
+  "dependencies": {
+    "axios": "^1.15.1",
+    "@rollup/plugin-commonjs": "^29.0.0",
+    "@rollup/plugin-json": "^6.1.0",
+    "@rollup/plugin-node-resolve": "^16.0.3",
+    "@rollup/plugin-terser": "^0.4.4"
+  },
+  "devDependencies": {
+    "@rollup/plugin-commonjs": "^29.0.0",
+    "@rollup/plugin-json": "^6.1.0",
+    "@rollup/plugin-node-resolve": "^16.0.3",
+    "@rollup/plugin-terser": "^0.4.4",
+    "rollup": "^4.9.6"
+  }
+}
