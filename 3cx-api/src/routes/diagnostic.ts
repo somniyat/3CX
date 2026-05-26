@@ -1,15 +1,16 @@
 import { Router, type Request, type Response } from "express";
-import { threecx } from "../config/3cx";
 import type { I3CXModule } from "../types/i3cx-module";
 
-export function createDiagnosticRouter(module: I3CXModule): Router {
+export function createDiagnosticRouter(injectedModule?: I3CXModule): Router {
   const router = Router();
 
-  router.get("/access-audit", async (_req: Request, res: Response) => {
+  const m = (req: Request) => injectedModule || req.threecx;
+
+  router.get("/access-audit", async (req: Request, res: Response) => {
     const start = Date.now();
     console.log("[Diagnostic] Audit lance");
 
-    const result = await module.runAccessAudit();
+    const result = await m(req).runAccessAudit();
 
     const elapsed = Date.now() - start;
     console.log(
@@ -22,4 +23,4 @@ export function createDiagnosticRouter(module: I3CXModule): Router {
   return router;
 }
 
-export default createDiagnosticRouter(threecx as unknown as I3CXModule);
+export default createDiagnosticRouter();

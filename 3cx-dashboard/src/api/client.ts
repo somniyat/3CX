@@ -1,10 +1,22 @@
-const API_KEY = import.meta.env.VITE_API_KEY || 'changez-moi-en-production';
+const BASE_URL = import.meta.env.VITE_THREECX_BASE_URL || '';
+const CLIENT_ID = import.meta.env.VITE_THREECX_CLIENT_ID || '';
+const CLIENT_SECRET = import.meta.env.VITE_THREECX_CLIENT_SECRET || '';
+
+function appendCredentials(url: string): string {
+  const params = new URLSearchParams();
+  if (BASE_URL) params.set('baseUrl', BASE_URL);
+  if (CLIENT_ID) params.set('clientId', CLIENT_ID);
+  if (CLIENT_SECRET) params.set('clientSecret', CLIENT_SECRET);
+  const qs = params.toString();
+  if (!qs) return url;
+  const separator = url.includes('?') ? '&' : '?';
+  return `${url}${separator}${qs}`;
+}
 
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(url, {
+  const res = await fetch(appendCredentials(url), {
     ...options,
     headers: {
-      'x-api-key': API_KEY,
       'Content-Type': 'application/json',
       ...options?.headers,
     },
@@ -37,7 +49,7 @@ export function getRecordings(params?: Record<string, string>) {
 }
 
 export function getRecordingDownloadUrl(id: string) {
-  return `/api/recordings/${id}/download?apiKey=${encodeURIComponent(API_KEY)}`;
+  return appendCredentials(`/api/recordings/${id}/download`);
 }
 
 // ─── Transcriptions ─────────────────────────────────────────

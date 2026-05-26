@@ -283,4 +283,6 @@ class ThreeCXModule {
     }
 }
 
-module.exports = new ThreeCXModule();
+const defaultInstance = new ThreeCXModule();
+defaultInstance.ThreeCXModule = ThreeCXModule;
+module.exports = defaultInstance;

@@ -1,6 +1,5 @@
 import { Router, type Request, type Response } from "express";
 import { z } from "zod";
-import { threecx } from "../config/3cx";
 import type { I3CXModule } from "../types/i3cx-module";
 
 // ─── Schemas de validation ──────────────────────────────────────
@@ -34,14 +33,16 @@ const recentQuerySchema = z.object({
   minutes: z.coerce.number().int().positive().max(10080).default(60),
 });
 
-export function createDriversRouter(module: I3CXModule): Router {
+export function createDriversRouter(injectedModule?: I3CXModule): Router {
   const router = Router();
+
+  const m = (req: Request) => injectedModule || req.threecx;
 
   // ─── Liste des chauffeurs ────────────────────────────────────
 
-  router.get("/", async (_req: Request, res: Response) => {
+  router.get("/", async (req: Request, res: Response) => {
     try {
-      const drivers = await module.listDrivers();
+      const drivers = await m(req).listDrivers();
       res.json({ data: drivers, total: drivers.length });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
@@ -61,7 +62,7 @@ export function createDriversRouter(module: I3CXModule): Router {
     }
 
     try {
-      const driver = module.createDriver(parsed.data);
+      const driver = m(req).createDriver(parsed.data);
       res.status(201).json(driver);
     } catch (err: any) {
       res.status(409).json({ error: err.message });
@@ -72,7 +73,7 @@ export function createDriversRouter(module: I3CXModule): Router {
 
   router.get("/by-phone/:phone", async (req: Request, res: Response) => {
     const phone = req.params.phone as string;
-    const driver = await module.getDriverByPhone(phone);
+    const driver = await m(req).getDriverByPhone(phone);
     if (!driver) {
       res.status(404).json({ error: `Aucun chauffeur avec le numero ${phone}` });
       return;
@@ -91,7 +92,7 @@ export function createDriversRouter(module: I3CXModule): Router {
     }
 
     try {
-      const dossier = await module.getDriverCommunicationsByPhone(phone, parsed.data);
+      const dossier = await m(req).getDriverCommunicationsByPhone(phone, parsed.data);
       res.json(dossier);
     } catch (err: any) {
       if (err.message.includes("introuvable") || err.message.includes("Aucun")) {
@@ -106,7 +107,7 @@ export function createDriversRouter(module: I3CXModule): Router {
 
   router.get("/:id", async (req: Request, res: Response) => {
     const id = req.params.id as string;
-    const driver = await module.getDriver(id);
+    const driver = await m(req).getDriver(id);
     if (!driver) {
       res.status(404).json({ error: `Chauffeur ${id} introuvable` });
       return;
@@ -128,7 +129,7 @@ export function createDriversRouter(module: I3CXModule): Router {
     }
 
     try {
-      const driver = module.updateDriver(id, parsed.data);
+      const driver = m(req).updateDriver(id, parsed.data);
       if (!driver) {
         res.status(404).json({ error: `Chauffeur ${id} introuvable` });
         return;
@@ -143,7 +144,7 @@ export function createDriversRouter(module: I3CXModule): Router {
 
   router.delete("/:id", (req: Request, res: Response) => {
     const id = req.params.id as string;
-    const deleted = module.deleteDriver(id);
+    const deleted = m(req).deleteDriver(id);
     if (!deleted) {
       res.status(404).json({ error: `Chauffeur ${id} introuvable` });
       return;
@@ -162,7 +163,7 @@ export function createDriversRouter(module: I3CXModule): Router {
     }
 
     try {
-      const dossier = await module.getDriverDossier(id, parsed.data);
+      const dossier = await m(req).getDriverDossier(id, parsed.data);
       res.json(dossier);
     } catch (err: any) {
       if (err.message.includes("introuvable")) {
@@ -184,7 +185,7 @@ export function createDriversRouter(module: I3CXModule): Router {
     }
 
     try {
-      const dossier = await module.getDriverRecentCommunications(id, parsed.data.minutes);
+      const dossier = await m(req).getDriverRecentCommunications(id, parsed.data.minutes);
       res.json(dossier);
     } catch (err: any) {
       if (err.message.includes("introuvable")) {
@@ -198,4 +199,4 @@ export function createDriversRouter(module: I3CXModule): Router {
   return router;
 }
 
-export default createDriversRouter(threecx as unknown as I3CXModule);
+export default createDriversRouter();

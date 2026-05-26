@@ -1,21 +1,22 @@
 import { Router, type Request, type Response } from "express";
-import { threecx } from "../config/3cx";
 import type { I3CXModule } from "../types/i3cx-module";
 
-export function createSystemRouter(module: I3CXModule): Router {
+export function createSystemRouter(injectedModule?: I3CXModule): Router {
   const router = Router();
 
-  router.get("/status", async (_req: Request, res: Response) => {
-    const data = await module.getSystemStatus();
+  const m = (req: Request) => injectedModule || req.threecx;
+
+  router.get("/status", async (req: Request, res: Response) => {
+    const data = await m(req).getSystemStatus();
     res.json(data);
   });
 
-  router.get("/extensions", async (_req: Request, res: Response) => {
-    const data = await module.getExtensions();
+  router.get("/extensions", async (req: Request, res: Response) => {
+    const data = await m(req).getExtensions();
     res.json({ data });
   });
 
   return router;
 }
 
-export default createSystemRouter(threecx as unknown as I3CXModule);
+export default createSystemRouter();

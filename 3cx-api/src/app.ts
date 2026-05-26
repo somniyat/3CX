@@ -2,16 +2,16 @@ import express from "express";
 import cors from "cors";
 import helmet from "helmet";
 import morgan from "morgan";
-import { apiKeyAuth } from "./middlewares/auth";
+import { resolve3cx } from "./middlewares/resolve3cx";
 import { errorHandler } from "./middlewares/error";
 import healthRouter from "./routes/health";
-import callsRouter, { createCallsRouter } from "./routes/calls";
-import recordingsRouter, { createRecordingsRouter } from "./routes/recordings";
-import systemRouter, { createSystemRouter } from "./routes/system";
-import transcriptionsRouter, { createTranscriptionsRouter } from "./routes/transcriptions";
-import usersRouter, { createUsersRouter } from "./routes/users";
-import diagnosticRouter, { createDiagnosticRouter } from "./routes/diagnostic";
-import driversRouter, { createDriversRouter } from "./routes/drivers";
+import { createCallsRouter } from "./routes/calls";
+import { createRecordingsRouter } from "./routes/recordings";
+import { createSystemRouter } from "./routes/system";
+import { createTranscriptionsRouter } from "./routes/transcriptions";
+import { createUsersRouter } from "./routes/users";
+import { createDiagnosticRouter } from "./routes/diagnostic";
+import { createDriversRouter } from "./routes/drivers";
 import type { I3CXModule } from "./types/i3cx-module";
 
 /**
@@ -30,11 +30,19 @@ export function createApp(module: I3CXModule): express.Express {
   const testApiKeyAuth: express.RequestHandler = (req, res, next) => {
     const key = req.header("x-api-key");
     const expected = process.env.API_KEY || "test-api-key-1234";
-    if (!key || key !== expected) {
-      res.status(401).json({ error: "Clé API invalide ou manquante" });
+    if (key && key === expected) {
+      next();
       return;
     }
-    next();
+
+    const clientSecret = req.query.clientSecret as string;
+    const expectedSecret = process.env.THREECX_CLIENT_SECRET || "";
+    if (clientSecret && clientSecret === expectedSecret) {
+      next();
+      return;
+    }
+
+    res.status(401).json({ error: "Clé API invalide ou manquante" });
   };
 
   app.use("/api/calls", testApiKeyAuth, createCallsRouter(module));
@@ -60,13 +68,14 @@ app.use(morgan("short"));
 
 app.use("/health", healthRouter);
 
-app.use("/api/calls", apiKeyAuth, callsRouter);
-app.use("/api/recordings", apiKeyAuth, recordingsRouter);
-app.use("/api/system", apiKeyAuth, systemRouter);
-app.use("/api/transcriptions", apiKeyAuth, transcriptionsRouter);
-app.use("/api/users", apiKeyAuth, usersRouter);
-app.use("/api/diagnostic", apiKeyAuth, diagnosticRouter);
-app.use("/api/drivers", apiKeyAuth, driversRouter);
+// resolve3cx sert a la fois d'auth et de resolution dynamique du module 3CX
+app.use("/api/calls", resolve3cx, createCallsRouter());
+app.use("/api/recordings", resolve3cx, createRecordingsRouter());
+app.use("/api/system", resolve3cx, createSystemRouter());
+app.use("/api/transcriptions", resolve3cx, createTranscriptionsRouter());
+app.use("/api/users", resolve3cx, createUsersRouter());
+app.use("/api/diagnostic", resolve3cx, createDiagnosticRouter());
+app.use("/api/drivers", resolve3cx, createDriversRouter());
 
 app.use(errorHandler);
 

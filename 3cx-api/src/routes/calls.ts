@@ -1,6 +1,5 @@
 import { Router, type Request, type Response } from "express";
 import { z } from "zod";
-import { threecx } from "../config/3cx";
 import type { CallRecord, Driver, I3CXModule, Recording, Transcription } from "../types/i3cx-module";
 
 const historyQuerySchema = z.object({
@@ -138,8 +137,10 @@ async function enrichCalls(module: I3CXModule, calls: CallRecord[], query: Histo
   });
 }
 
-export function createCallsRouter(module: I3CXModule): Router {
+export function createCallsRouter(injectedModule?: I3CXModule): Router {
   const router = Router();
+
+  const m = (req: Request) => injectedModule || req.threecx;
 
   router.get("/history", async (req: Request, res: Response) => {
     const parsed = historyQuerySchema.safeParse(req.query);
@@ -148,6 +149,7 @@ export function createCallsRouter(module: I3CXModule): Router {
       return;
     }
     try {
+      const module = m(req);
       const query = parsed.data;
       const driver = await getDriverFromQuery(module, query);
       const data = normalizePaginated(await module.getCallHistory(query) as PaginatedLike<CallRecord>);
@@ -174,6 +176,7 @@ export function createCallsRouter(module: I3CXModule): Router {
       return;
     }
     try {
+      const module = m(req);
       const data = await module.getAllCallHistory(parsed.data);
       res.json({ data, total: data.length, list: data, totalCount: data.length });
     } catch (err: any) {
@@ -187,8 +190,9 @@ export function createCallsRouter(module: I3CXModule): Router {
     }
   });
 
-  router.get("/active", async (_req: Request, res: Response) => {
+  router.get("/active", async (req: Request, res: Response) => {
     try {
+      const module = m(req);
       const data = await module.getActiveCalls();
       res.json({ data });
     } catch (err: any) {
@@ -204,4 +208,4 @@ export function createCallsRouter(module: I3CXModule): Router {
   return router;
 }
 
-export default createCallsRouter(threecx as unknown as I3CXModule);
+export default createCallsRouter();

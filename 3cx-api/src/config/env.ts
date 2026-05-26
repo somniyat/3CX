@@ -3,10 +3,10 @@ import { z } from "zod";
 
 const envSchema = z.object({
   PORT: z.coerce.number().default(3002),
-  API_KEY: z.string().min(1, "API_KEY est requis"),
-  THREECX_BASE_URL: z.string().url("THREECX_BASE_URL doit etre une URL valide"),
-  THREECX_CLIENT_ID: z.string().min(1, "THREECX_CLIENT_ID est requis"),
-  THREECX_CLIENT_SECRET: z.string().min(1, "THREECX_CLIENT_SECRET est requis"),
+  API_KEY: z.string().optional(),
+  THREECX_BASE_URL: z.string().url().optional(),
+  THREECX_CLIENT_ID: z.string().optional(),
+  THREECX_CLIENT_SECRET: z.string().optional(),
 });
 
 const parsed = envSchema.safeParse(process.env);

@@ -1,6 +1,5 @@
 import { Router, type Request, type Response } from "express";
 import { z } from "zod";
-import { threecx } from "../config/3cx";
 import type { I3CXModule, Recording } from "../types/i3cx-module";
 
 const listQuerySchema = z.object({
@@ -42,8 +41,10 @@ function filterRecordings(recordings: Recording[], query: z.infer<typeof listQue
   });
 }
 
-export function createRecordingsRouter(module: I3CXModule): Router {
+export function createRecordingsRouter(injectedModule?: I3CXModule): Router {
   const router = Router();
+
+  const m = (req: Request) => injectedModule || req.threecx;
 
   router.get("/", async (req: Request, res: Response) => {
     const parsed = listQuerySchema.safeParse(req.query);
@@ -51,7 +52,7 @@ export function createRecordingsRouter(module: I3CXModule): Router {
       res.status(400).json({ error: "Paramètres invalides", details: parsed.error.flatten().fieldErrors });
       return;
     }
-    const data = normalizePaginated(await module.getRecordings(parsed.data as any) as PaginatedLike<Recording>);
+    const data = normalizePaginated(await m(req).getRecordings(parsed.data as any) as PaginatedLike<Recording>);
     const list = filterRecordings(data.list, parsed.data);
     const filteredOnApi = Boolean(parsed.data.phone || parsed.data.caller || parsed.data.callee || parsed.data.transcribed);
     res.json({ list, totalCount: filteredOnApi ? list.length : data.totalCount, data: list, total: filteredOnApi ? list.length : data.totalCount });
@@ -60,7 +61,7 @@ export function createRecordingsRouter(module: I3CXModule): Router {
   router.get("/:id/download", async (req: Request<{ id: string }>, res: Response) => {
     const id = req.params.id as string;
     try {
-      const { stream, contentType } = await module.downloadRecording(id);
+      const { stream, contentType } = await m(req).downloadRecording(id);
       res.setHeader("Content-Type", contentType || "audio/wav");
       res.setHeader("Content-Disposition", `attachment; filename="recording-${id}.wav"`);
       (stream as any).pipe(res);
@@ -74,4 +75,4 @@ export function createRecordingsRouter(module: I3CXModule): Router {
   return router;
 }
 
-export default createRecordingsRouter(threecx as unknown as I3CXModule);
+export default createRecordingsRouter();

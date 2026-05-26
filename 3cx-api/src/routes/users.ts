@@ -1,6 +1,5 @@
 import { Router, type Request, type Response } from "express";
 import { z } from "zod";
-import { threecx } from "../config/3cx";
 import type { I3CXModule } from "../types/i3cx-module";
 
 const listUsersQuery = z.object({
@@ -10,8 +9,10 @@ const listUsersQuery = z.object({
   enabledOnly: z.coerce.boolean().optional(),
 });
 
-export function createUsersRouter(module: I3CXModule): Router {
+export function createUsersRouter(injectedModule?: I3CXModule): Router {
   const router = Router();
+
+  const m = (req: Request) => injectedModule || req.threecx;
 
   router.get("/", async (req: Request, res: Response) => {
     const parsed = listUsersQuery.safeParse(req.query);
@@ -26,7 +27,7 @@ export function createUsersRouter(module: I3CXModule): Router {
     const start = Date.now();
 
     try {
-      const result = await module.listUsers(parsed.data);
+      const result = await m(req).listUsers(parsed.data);
       const elapsed = Date.now() - start;
       console.log(
         `[Users] page=${parsed.data.page} pageSize=${parsed.data.pageSize} search=${parsed.data.search ?? ""} → ${result.items.length} items en ${elapsed}ms`
@@ -48,4 +49,4 @@ export function createUsersRouter(module: I3CXModule): Router {
   return router;
 }
 
-export default createUsersRouter(threecx as unknown as I3CXModule);
+export default createUsersRouter();
