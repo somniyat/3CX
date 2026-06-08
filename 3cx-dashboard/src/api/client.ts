@@ -2,22 +2,20 @@ const BASE_URL = import.meta.env.VITE_THREECX_BASE_URL || '';
 const CLIENT_ID = import.meta.env.VITE_THREECX_CLIENT_ID || '';
 const CLIENT_SECRET = import.meta.env.VITE_THREECX_CLIENT_SECRET || '';
 
-function appendCredentials(url: string): string {
-  const params = new URLSearchParams();
-  if (BASE_URL) params.set('baseUrl', BASE_URL);
-  if (CLIENT_ID) params.set('clientId', CLIENT_ID);
-  if (CLIENT_SECRET) params.set('clientSecret', CLIENT_SECRET);
-  const qs = params.toString();
-  if (!qs) return url;
-  const separator = url.includes('?') ? '&' : '?';
-  return `${url}${separator}${qs}`;
+function getCredentialHeaders(): Record<string, string> {
+  const headers: Record<string, string> = {};
+  if (BASE_URL) headers['x-3cx-base-url'] = BASE_URL;
+  if (CLIENT_ID) headers['x-3cx-client-id'] = CLIENT_ID;
+  if (CLIENT_SECRET) headers['x-3cx-client-secret'] = CLIENT_SECRET;
+  return headers;
 }
 
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(appendCredentials(url), {
+  const res = await fetch(url, {
     ...options,
     headers: {
       'Content-Type': 'application/json',
+      ...getCredentialHeaders(),
       ...options?.headers,
     },
   });
@@ -49,7 +47,37 @@ export function getRecordings(params?: Record<string, string>) {
 }
 
 export function getRecordingDownloadUrl(id: string) {
-  return appendCredentials(`/api/recordings/${id}/download`);
+  return `/api/recordings/${id}/download`;
+}
+
+/**
+ * Telecharge un enregistrement via fetch avec les headers d'auth,
+ * puis declenche le telechargement cote navigateur.
+ */
+export async function downloadRecording(id: string, filename?: string): Promise<void> {
+  const res = await fetch(getRecordingDownloadUrl(id), {
+    headers: getCredentialHeaders(),
+  });
+  if (!res.ok) throw new Error(`Erreur ${res.status}: ${res.statusText}`);
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename || `recording-${id}.wav`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+/**
+ * Cree une URL blob pour la lecture audio avec les headers d'auth.
+ */
+export async function getRecordingAudioUrl(id: string): Promise<string> {
+  const res = await fetch(getRecordingDownloadUrl(id), {
+    headers: getCredentialHeaders(),
+  });
+  if (!res.ok) throw new Error(`Erreur ${res.status}: ${res.statusText}`);
+  const blob = await res.blob();
+  return URL.createObjectURL(blob);
 }
 
 // ─── Transcriptions ─────────────────────────────────────────

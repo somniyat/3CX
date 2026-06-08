@@ -1,7 +1,10 @@
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
-import morgan from "morgan";
+import { rateLimit } from "express-rate-limit";
+import { pinoHttp } from "pino-http";
+import { env } from "./config/env";
+import { logger } from "./config/logger";
 import { resolve3cx } from "./middlewares/resolve3cx";
 import { errorHandler } from "./middlewares/error";
 import healthRouter from "./routes/health";
@@ -13,6 +16,30 @@ import { createUsersRouter } from "./routes/users";
 import { createDiagnosticRouter } from "./routes/diagnostic";
 import { createDriversRouter } from "./routes/drivers";
 import type { I3CXModule } from "./types/i3cx-module";
+
+// ─── CORS : whitelist d'origines ────────────────────────────
+const allowedOrigins = env.CORS_ORIGINS.split(",").map((o) => o.trim()).filter(Boolean);
+
+const corsOptions: cors.CorsOptions = {
+  origin(origin, callback) {
+    // Autoriser les requêtes sans origin (curl, health checks, etc.)
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error(`Origine CORS non autorisée : ${origin}`));
+    }
+  },
+  credentials: true,
+};
+
+// ─── Rate limiter ───────────────────────────────────────────
+const limiter = rateLimit({
+  windowMs: env.RATE_LIMIT_WINDOW_MS,
+  max: env.RATE_LIMIT_MAX,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Trop de requêtes — réessayez plus tard" },
+});
 
 /**
  * Factory : construit une app Express en injectant le module 3CX.
@@ -35,7 +62,7 @@ export function createApp(module: I3CXModule): express.Express {
       return;
     }
 
-    const clientSecret = req.query.clientSecret as string;
+    const clientSecret = req.header("x-3cx-client-secret");
     const expectedSecret = process.env.THREECX_CLIENT_SECRET || "";
     if (clientSecret && clientSecret === expectedSecret) {
       next();
@@ -62,9 +89,10 @@ export function createApp(module: I3CXModule): express.Express {
 const app = express();
 
 app.use(helmet());
-app.use(cors());
+app.use(cors(corsOptions));
 app.use(express.json());
-app.use(morgan("short"));
+app.use(limiter);
+app.use(pinoHttp({ logger }));
 
 app.use("/health", healthRouter);
 
@@ -74,8 +102,16 @@ app.use("/api/recordings", resolve3cx, createRecordingsRouter());
 app.use("/api/system", resolve3cx, createSystemRouter());
 app.use("/api/transcriptions", resolve3cx, createTranscriptionsRouter());
 app.use("/api/users", resolve3cx, createUsersRouter());
-app.use("/api/diagnostic", resolve3cx, createDiagnosticRouter());
 app.use("/api/drivers", resolve3cx, createDriversRouter());
+
+// Diagnostic : desactive en production, protege par resolve3cx sinon
+if (env.NODE_ENV !== "production") {
+  app.use("/api/diagnostic", resolve3cx, createDiagnosticRouter());
+} else {
+  app.use("/api/diagnostic", (_req, res) => {
+    res.status(404).json({ error: "Endpoint indisponible en production" });
+  });
+}
 
 app.use(errorHandler);
 

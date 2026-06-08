@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Download, FileText, Filter, Mic, PhoneCall, Search, Timer, Truck } from 'lucide-react';
-import { getCallHistory, getRecordingDownloadUrl, listDrivers, type CallRecord, type Driver } from '../api';
+import { getCallHistory, downloadRecording, listDrivers, type CallRecord, type Driver } from '../api';
 import { useFetch } from '../hooks/useFetch';
 import Loader from '../components/Loader';
 import ErrorMessage from '../components/ErrorMessage';
@@ -176,7 +176,7 @@ export default function Dashboard() {
                   <td><StatusBadge status={call.status} /></td>
                   <td>
                     {recordingId ? (
-                      <a className="btn btn-sm" href={getRecordingDownloadUrl(recordingId)} download><Download size={14} /> Audio</a>
+                      <button className="btn btn-sm" onClick={() => downloadRecording(recordingId)}><Download size={14} /> Audio</button>
                     ) : <span className="muted">Aucun</span>}
                   </td>
                   <td className="transcript-cell">

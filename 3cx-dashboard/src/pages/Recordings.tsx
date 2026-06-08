@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from 'react';
 import { Download, FileText, Filter, Pause, Play } from 'lucide-react';
-import { getRecordingDownloadUrl, getRecordings, type Recording } from '../api';
+import { downloadRecording, getRecordingAudioUrl, getRecordings, type Recording } from '../api';
 import { useFetch } from '../hooks/useFetch';
 import Loader from '../components/Loader';
 import ErrorMessage from '../components/ErrorMessage';
@@ -51,8 +51,7 @@ export default function Recordings() {
     setFilters((current) => ({ ...current, [name]: value }));
   };
 
-  const togglePlayback = (rec: Recording) => {
-    const url = getRecordingDownloadUrl(rec.id);
+  const togglePlayback = async (rec: Recording) => {
     if (playingId === rec.id) {
       audioRef.current?.pause();
       setPlayingId(null);
@@ -60,8 +59,12 @@ export default function Recordings() {
     }
 
     audioRef.current?.pause();
-    const audio = new Audio(url);
-    audio.onended = () => setPlayingId(null);
+    const blobUrl = await getRecordingAudioUrl(rec.id);
+    const audio = new Audio(blobUrl);
+    audio.onended = () => {
+      setPlayingId(null);
+      URL.revokeObjectURL(blobUrl);
+    };
     audioRef.current = audio;
     audio.play();
     setPlayingId(rec.id);
@@ -134,9 +137,9 @@ export default function Recordings() {
                           {playingId === rec.id ? <Pause size={14} /> : <Play size={14} />}
                           {playingId === rec.id ? 'Pause' : 'Écouter'}
                         </button>
-                        <a href={getRecordingDownloadUrl(rec.id)} className="btn btn-sm" download>
+                        <button className="btn btn-sm" onClick={() => downloadRecording(rec.id)}>
                           <Download size={14} /> Télécharger
-                        </a>
+                        </button>
                       </div>
                     </td>
                     <td className="transcript-cell wide">

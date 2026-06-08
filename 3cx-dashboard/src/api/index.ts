@@ -7,6 +7,8 @@ export {
   getActiveCalls,
   getRecordings,
   getRecordingDownloadUrl,
+  downloadRecording,
+  getRecordingAudioUrl,
   getTranscriptions,
   getTranscription,
   getSystemStatus,

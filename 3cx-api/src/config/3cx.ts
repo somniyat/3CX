@@ -1,5 +1,7 @@
 import threecx from "@omniyat/3cx-module";
+import { LRUCache } from "lru-cache";
 import { env } from "./env";
+import { logger } from "./logger";
 
 const { ThreeCXModule } = threecx as any;
 
@@ -16,14 +18,20 @@ export async function init3CX(): Promise<void> {
       timeout: 30000,
     });
     initialized = true;
-    console.log("[3CX] Module initialise avec OAuth2 client_credentials");
+    logger.info("[3CX] Module initialise avec OAuth2 client_credentials");
   } else {
-    console.log("[3CX] Pas de credentials .env — mode dynamique (credentials via URL)");
+    logger.info("[3CX] Pas de credentials .env — mode dynamique (credentials via headers)");
   }
 }
 
-// Cache des instances par combo baseUrl+clientId+clientSecret
-const moduleCache = new Map<string, any>();
+// LRU cache : max 50 instances, TTL 30 minutes
+const moduleCache = new LRUCache<string, any>({
+  max: 50,
+  ttl: 30 * 60 * 1000,
+  dispose(_value, key) {
+    logger.debug({ key: key.split("|")[0] }, "Instance 3CX module evictee du cache");
+  },
+});
 
 export function getModuleForCredentials(baseUrl: string, clientId: string, clientSecret: string) {
   const key = `${baseUrl}|${clientId}|${clientSecret}`;
@@ -32,6 +40,7 @@ export function getModuleForCredentials(baseUrl: string, clientId: string, clien
     instance = new ThreeCXModule();
     instance.init({ baseUrl, clientId, clientSecret, timeout: 30000 });
     moduleCache.set(key, instance);
+    logger.debug({ baseUrl }, "Nouvelle instance 3CX module creee");
   }
   return instance;
 }

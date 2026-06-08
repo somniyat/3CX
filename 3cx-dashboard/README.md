@@ -1,73 +1,77 @@
-# React + TypeScript + Vite
+# 3CX Dashboard — Audit Livraison
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Dashboard de controle qualite livraison : verifier que les chauffeurs appellent les clients avant la livraison, avec la duree, et la transcription lorsqu'elle est generee par 3CX.
 
-Currently, two official plugins are available:
+## Architecture
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
-
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```
+3CX/
+├── 3cx-api/          # Backend — Express/Fastify (port 3002)
+├── 3cx-dashboard/    # Frontend — React + TypeScript + Vite (port 5173)
+└── docker-compose.yml
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+Le frontend proxy les appels `/api` vers le backend (port 3002) via Vite.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+## Stack
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+| Couche   | Technologies                                       |
+| -------- | -------------------------------------------------- |
+| Frontend | React 19, TypeScript, Vite, React Router, Lucide   |
+| Backend  | Node.js (port 3002)                                |
+
+## Pages
+
+- **Dashboard** (`/`) — Historique des appels chauffeurs avec filtres (date, heure, chauffeur, telephone, statut)
+- **Enregistrements** (`/recordings`) — Liste des enregistrements d'appels
+
+## Prerequis
+
+- Node.js >= 18
+- Le backend `3cx-api` lance sur le port 3002
+- Un serveur 3CX avec des credentials API
+
+## Installation
+
+```bash
+cd 3cx-dashboard
+npm install
 ```
+
+## Configuration
+
+Copier le fichier d'exemple et renseigner les credentials 3CX :
+
+```bash
+cp .env.example .env
+```
+
+Variables requises dans `.env` :
+
+| Variable                    | Description                        |
+| --------------------------- | ---------------------------------- |
+| VITE_THREECX_BASE_URL       | URL du serveur 3CX                 |
+| VITE_THREECX_CLIENT_ID      | Client ID de l'API 3CX             |
+| VITE_THREECX_CLIENT_SECRET  | Client Secret de l'API 3CX         |
+
+## Lancement
+
+```bash
+# Demarrer le backend d'abord
+cd ../3cx-api
+npm run dev
+
+# Puis le frontend
+cd ../3cx-dashboard
+npm run dev
+```
+
+Le dashboard est accessible sur [http://localhost:5173](http://localhost:5173).
+
+## Build production
+
+```bash
+npm run build
+```
+
+Les fichiers statiques sont generes dans `dist/`.

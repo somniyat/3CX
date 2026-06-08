@@ -190,6 +190,104 @@ export function createCallsRouter(injectedModule?: I3CXModule): Router {
     }
   });
 
+  // ─── POST /lookup — Recherche d'historique par numéros + créneau ───
+  const lookupSchema = z.object({
+    phones: z.array(z.string().min(1)).min(1, "Au moins un numéro requis"),
+    from: z.string().min(1, "Date/heure de début requise (ISO 8601 ou YYYY-MM-DD)"),
+    to: z.string().min(1, "Date/heure de fin requise (ISO 8601 ou YYYY-MM-DD)"),
+    page: z.coerce.number().int().positive().default(1),
+    pageSize: z.coerce.number().int().positive().max(500).default(50),
+  });
+
+  router.post("/lookup", async (req: Request, res: Response) => {
+    const parsed = lookupSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({
+        error: "Paramètres invalides",
+        details: parsed.error.flatten().fieldErrors,
+        example: {
+          phones: ["+41791234567", "1001"],
+          from: "2025-06-01",
+          to: "2025-06-07T23:59:59Z",
+          page: 1,
+          pageSize: 50,
+        },
+      });
+      return;
+    }
+
+    const { phones, from, to, page, pageSize } = parsed.data;
+    const module = m(req);
+
+    try {
+      // Récupérer l'historique brut sur le créneau demandé
+      const raw = normalizePaginated(
+        await module.getCallHistory({
+          startDate: from,
+          endDate: to,
+          page: 1,
+          pageSize: 500,
+        }) as PaginatedLike<CallRecord>,
+      );
+
+      // Si le module retourne moins que le total, paginer côté 3CX
+      let allCalls = raw.list;
+      if (raw.totalCount > 500) {
+        const extraPages = Math.ceil(raw.totalCount / 500);
+        const fetches: Promise<CallRecord[]>[] = [];
+        for (let p = 2; p <= extraPages && allCalls.length < 5000; p++) {
+          fetches.push(
+            module.getCallHistory({ startDate: from, endDate: to, page: p, pageSize: 500 })
+              .then((r: any) => normalizePaginated(r as PaginatedLike<CallRecord>).list),
+          );
+        }
+        const extra = await Promise.all(fetches);
+        allCalls = allCalls.concat(...extra);
+      }
+
+      // Filtrer par numéros de téléphone
+      const normalizedPhones = phones.map((p) => digits(p));
+
+      const matched = allCalls.filter((call) =>
+        normalizedPhones.some(
+          (needle) => includesPhone(call.caller, needle) || includesPhone(call.callee, needle),
+        ),
+      );
+
+      // Grouper les résultats par numéro
+      const byPhone: Record<string, CallRecord[]> = {};
+      for (const phone of phones) {
+        const needle = digits(phone);
+        byPhone[phone] = matched.filter(
+          (call) => includesPhone(call.caller, needle) || includesPhone(call.callee, needle),
+        );
+      }
+
+      // Pagination sur le résultat global
+      const start = (page - 1) * pageSize;
+      const paginated = matched.slice(start, start + pageSize);
+
+      res.json({
+        query: { phones, from, to },
+        totalMatched: matched.length,
+        page,
+        pageSize,
+        totalPages: Math.ceil(matched.length / pageSize),
+        calls: paginated,
+        byPhone,
+      });
+    } catch (err: any) {
+      const status = err.response?.status;
+      if (status === 403) {
+        res.status(403).json({ error: "Accès interdit — permissions insuffisantes" });
+      } else if (status === 500 || err.code === "ECONNABORTED") {
+        res.status(503).json({ error: "Serveur 3CX indisponible", details: err.message });
+      } else {
+        throw err;
+      }
+    }
+  });
+
   router.get("/active", async (req: Request, res: Response) => {
     try {
       const module = m(req);
