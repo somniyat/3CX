@@ -4,16 +4,25 @@ API d'integration 3CX permettant de recuperer l'historique des appels d'un serve
 
 ## Architecture
 
+Le projet est un **monolithe unifie** : le module d'integration 3CX (OAuth2, appels, enregistrements) est integre directement dans l'API Express.
+
 ```
-3CX/
-  3cxModule/       Module Node.js d'integration 3CX (OAuth2, appels, enregistrements)
-  3cx-api/         API REST Express (proxy stateless vers le module)
-  3cx-dashboard/   Interface web React + Vite (optionnel)
+3cx-api/
+  src/
+    module/            Module d'integration 3CX (OAuth2, XAPI, normalisation)
+      services/        Auth, CallHistory, Recordings, Transcriptions, System, Drivers
+      utils/           Client HTTP Axios avec gestion auto du token
+    routes/            Endpoints REST (calls, recordings, transcriptions, system, users, drivers)
+    middlewares/       Auth, resolve3cx, error handler
+    config/            Env, logger, initialisation 3CX
+    types/             Interfaces TypeScript
+
+3cx-dashboard/         Interface web React + Vite (optionnel)
 ```
 
 ```
-Client (curl, app, dashboard)  --->  API Express  --->  3cxModule  --->  Serveur 3CX
-                                       :3002                               :5001
+Client (curl, app, dashboard)  --->  API Express  --->  Serveur 3CX
+                                       :3002               :5001
 ```
 
 ## Cas d'usage principal
@@ -94,11 +103,8 @@ L'API est disponible sur `http://localhost:3002`, le dashboard sur `http://local
 ### Sans Docker
 
 ```bash
-# 1. Builder le module
-cd 3cxModule && npm install && npm run build && cd ..
-
-# 2. Lancer l'API
-cd 3cx-api && npm install
+cd 3cx-api
+npm install
 cp .env.example .env   # Editer avec vos valeurs
 npm run dev             # Dev (hot-reload) ou npm start (prod)
 ```
@@ -211,7 +217,7 @@ npm run test:coverage # Couverture de code
 
 ## Stack technique
 
-- **Module** : Node.js, Axios, OAuth2 (client_credentials), Rollup
-- **API** : Express 5, TypeScript, Zod, Helmet, Pino, express-rate-limit, Vitest
+- **API** : Express 5, TypeScript, Axios, Zod, Helmet, Pino, express-rate-limit, Vitest
+- **Module 3CX integre** : OAuth2 (client_credentials), XAPI OData, normalisation multi-format
 - **Dashboard** : React 19, Vite, TypeScript
 - **Deploiement** : Docker, Docker Compose, Nginx

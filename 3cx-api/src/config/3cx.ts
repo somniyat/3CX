@@ -1,9 +1,7 @@
-import threecx from "@omniyat/3cx-module";
+import defaultInstance, { ThreeCXModule } from "../module";
 import { LRUCache } from "lru-cache";
 import { env } from "./env";
 import { logger } from "./logger";
-
-const { ThreeCXModule } = threecx as any;
 
 let initialized = false;
 
@@ -11,7 +9,7 @@ export async function init3CX(): Promise<void> {
   if (initialized) return;
 
   if (env.THREECX_BASE_URL && env.THREECX_CLIENT_ID && env.THREECX_CLIENT_SECRET) {
-    threecx.init({
+    defaultInstance.init({
       baseUrl: env.THREECX_BASE_URL,
       clientId: env.THREECX_CLIENT_ID,
       clientSecret: env.THREECX_CLIENT_SECRET,
@@ -25,7 +23,7 @@ export async function init3CX(): Promise<void> {
 }
 
 // LRU cache : max 50 instances, TTL 30 minutes
-const moduleCache = new LRUCache<string, any>({
+const moduleCache = new LRUCache<string, ThreeCXModule>({
   max: 50,
   ttl: 30 * 60 * 1000,
   dispose(_value, key) {
@@ -33,7 +31,7 @@ const moduleCache = new LRUCache<string, any>({
   },
 });
 
-export function getModuleForCredentials(baseUrl: string, clientId: string, clientSecret: string) {
+export function getModuleForCredentials(baseUrl: string, clientId: string, clientSecret: string): ThreeCXModule {
   const key = `${baseUrl}|${clientId}|${clientSecret}`;
   let instance = moduleCache.get(key);
   if (!instance) {
@@ -45,4 +43,4 @@ export function getModuleForCredentials(baseUrl: string, clientId: string, clien
   return instance;
 }
 
-export { threecx };
+export { defaultInstance as threecx };

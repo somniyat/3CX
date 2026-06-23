@@ -14,7 +14,7 @@
   "author": "Omniyat <contact@omniyat.com>",
   "license": "ISC",
   "dependencies": {
-    "@omniyat/3cx-module": "file:../3cxModule",
+    "axios": "^1.15.1",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "express": "^5.1.0",
