@@ -1,10 +1,13 @@
 import { useMemo, useState } from 'react';
-import { Download, FileText, Filter, Mic, PhoneCall, Search, Timer, Truck } from 'lucide-react';
-import { getCallHistory, downloadRecording, listDrivers, type CallRecord, type Driver } from '../api';
+import { ArrowDown, ArrowUp, ArrowUpDown, Filter, PhoneCall, Search, Timer, Truck } from 'lucide-react';
+import { getCallHistory, listDrivers, type CallRecord, type Driver } from '../api';
 import { useFetch } from '../hooks/useFetch';
 import Loader from '../components/Loader';
 import ErrorMessage from '../components/ErrorMessage';
 import StatusBadge from '../components/StatusBadge';
+
+type SortField = 'date' | 'caller' | 'callee' | 'duration' | 'status';
+type SortOrder = 'asc' | 'desc';
 
 type Filters = {
   startDate: string;
@@ -37,11 +40,6 @@ function compactParty(number?: string, name?: string) {
   return label || '-';
 }
 
-function transcriptText(call: CallRecord) {
-  const transcript = call.transcript?.transcription || call.recording?.transcription || '';
-  return transcript.trim();
-}
-
 export default function Dashboard() {
   const [page, setPage] = useState(1);
   const [filters, setFilters] = useState<Filters>({
@@ -53,11 +51,34 @@ export default function Dashboard() {
     phone: '',
     status: '',
   });
+  const [sortBy, setSortBy] = useState<SortField | ''>('');
+  const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
+
+  const toggleSort = (field: SortField) => {
+    setPage(1);
+    if (sortBy === field) {
+      setSortOrder((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortBy(field);
+      setSortOrder(field === 'date' ? 'desc' : 'asc');
+    }
+  };
+
+  const SortIcon = ({ field }: { field: SortField }) => {
+    if (sortBy !== field) return <ArrowUpDown size={14} className="sort-icon sort-icon--inactive" />;
+    return sortOrder === 'asc'
+      ? <ArrowUp size={14} className="sort-icon sort-icon--active" />
+      : <ArrowDown size={14} className="sort-icon sort-icon--active" />;
+  };
 
   const params = useMemo(() => {
     const entries = Object.entries(filters).filter(([, value]) => value);
-    return Object.fromEntries([...entries, ['page', String(page)], ['pageSize', String(PAGE_SIZE)]]) as Record<string, string>;
-  }, [filters, page]);
+    const all: [string, string][] = [...entries, ['page', String(page)], ['pageSize', String(PAGE_SIZE)]];
+    if (sortBy) {
+      all.push(['sortBy', sortBy], ['sortOrder', sortOrder]);
+    }
+    return Object.fromEntries(all) as Record<string, string>;
+  }, [filters, page, sortBy, sortOrder]);
 
   const calls = useFetch(() => getCallHistory(params), [params]);
   const drivers = useFetch(() => listDrivers());
@@ -65,8 +86,6 @@ export default function Dashboard() {
   const rows = calls.data?.list ?? [];
   const total = calls.data?.totalCount ?? 0;
   const answered = rows.filter((call) => call.status === 'answered').length;
-  const withRecording = rows.filter((call) => call.recording || call.recordingId).length;
-  const withTranscript = rows.filter((call) => transcriptText(call)).length;
 
   const updateFilter = (name: keyof Filters, value: string) => {
     setPage(1);
@@ -98,14 +117,6 @@ export default function Dashboard() {
         <div className="card card-green">
           <div className="card-icon"><Timer size={28} /></div>
           <div className="card-body"><span className="card-value">{answered}</span><span className="card-label">Appels répondus sur cette page</span></div>
-        </div>
-        <div className="card card-purple">
-          <div className="card-icon"><Mic size={28} /></div>
-          <div className="card-body"><span className="card-value">{withRecording}</span><span className="card-label">Avec enregistrement</span></div>
-        </div>
-        <div className="card card-orange">
-          <div className="card-icon"><FileText size={28} /></div>
-          <div className="card-body"><span className="card-value">{withTranscript}</span><span className="card-label">Avec transcript</span></div>
         </div>
       </div>
 
@@ -149,20 +160,15 @@ export default function Dashboard() {
         <table className="table audit-table">
           <thead>
             <tr>
-              <th>Date</th>
-              <th>Chauffeur / appelant</th>
-              <th>Client / appelé</th>
-              <th>Durée</th>
-              <th>Statut</th>
-              <th>Enregistrement</th>
-              <th>Transcript</th>
+              <th className="sortable-th" onClick={() => toggleSort('date')}>Date <SortIcon field="date" /></th>
+              <th className="sortable-th" onClick={() => toggleSort('caller')}>Chauffeur / appelant <SortIcon field="caller" /></th>
+              <th className="sortable-th" onClick={() => toggleSort('callee')}>Client / appelé <SortIcon field="callee" /></th>
+              <th className="sortable-th" onClick={() => toggleSort('duration')}>Durée <SortIcon field="duration" /></th>
+              <th className="sortable-th" onClick={() => toggleSort('status')}>Statut <SortIcon field="status" /></th>
             </tr>
           </thead>
           <tbody>
-            {rows.map((call, index) => {
-              const recordingId = call.recording?.id || call.recordingId || '';
-              const text = transcriptText(call);
-              return (
+            {rows.map((call, index) => (
                 <tr key={call.id || index}>
                   <td>{formatDate(call.startTime)}</td>
                   <td>
@@ -174,17 +180,8 @@ export default function Dashboard() {
                   <td>{compactParty(call.callee, call.calleeName)}</td>
                   <td className={call.duration ? '' : 'duration-warning'}>{formatDuration(call.duration)}</td>
                   <td><StatusBadge status={call.status} /></td>
-                  <td>
-                    {recordingId ? (
-                      <button className="btn btn-sm" onClick={() => downloadRecording(recordingId)}><Download size={14} /> Audio</button>
-                    ) : <span className="muted">Aucun</span>}
-                  </td>
-                  <td className="transcript-cell">
-                    {text ? <details><summary>Voir</summary><p>{text}</p></details> : <span className="muted">Non disponible</span>}
-                  </td>
                 </tr>
-              );
-            })}
+            ))}
           </tbody>
         </table>
         </div>

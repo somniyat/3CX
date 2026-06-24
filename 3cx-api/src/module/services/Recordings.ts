@@ -41,6 +41,9 @@ export async function getRecordings(
     $orderby: "StartTime desc",
   };
 
+  // Only date filters are sent as OData $filter — caller/callee/phone/transcribed
+  // filtering is handled client-side because the 3CX OData API does not reliably
+  // support contains() on these fields.
   const filters: string[] = [];
   if (options.startDate) {
     filters.push(`StartTime ge ${formatDateTimeBoundary(options.startDate, "start")}`);
@@ -48,24 +51,6 @@ export async function getRecordings(
   if (options.endDate) {
     filters.push(`StartTime le ${formatDateTimeBoundary(options.endDate, "end")}`);
   }
-  if (options.caller) {
-    filters.push(
-      `(contains(FromCallerNumber,'${escapeOData(options.caller)}') or contains(FromCallerId,'${escapeOData(options.caller)}') or contains(FromDisplayName,'${escapeOData(options.caller)}'))`,
-    );
-  }
-  if (options.callee) {
-    filters.push(
-      `(contains(ToCallerNumber,'${escapeOData(options.callee)}') or contains(ToCallerId,'${escapeOData(options.callee)}') or contains(ToDisplayName,'${escapeOData(options.callee)}'))`,
-    );
-  }
-  if (options.phone) {
-    const phone = escapeOData(options.phone);
-    filters.push(
-      `(contains(FromCallerNumber,'${phone}') or contains(FromCallerId,'${phone}') or contains(ToCallerNumber,'${phone}') or contains(ToCallerId,'${phone}'))`,
-    );
-  }
-  if (options.transcribed === "true") filters.push("IsTranscribed eq true");
-  if (options.transcribed === "false") filters.push("IsTranscribed eq false");
   if (filters.length) {
     params.$filter = filters.join(" and ");
   }
@@ -99,10 +84,12 @@ export async function downloadRecording(
 
 function normalizeRecording(raw: any): NormalizedRecording {
   const startTime = raw.StartTime || raw.RecordingStartTime || raw.CreatedAt || raw.Date || raw.CreationTime || "";
-  const duration = parseDuration(
+  const endTime = raw.EndTime || raw.RecordingEndTime || "";
+  const explicitDuration = parseDuration(
     raw.Duration ?? raw.RecordingDuration ?? raw.CallDuration ?? raw.TalkingDuration ?? raw.CallTime ?? raw.TalkingTime,
   );
-  const endTime = raw.EndTime || raw.RecordingEndTime || addSecondsToDate(startTime, duration);
+  // Compute from StartTime/EndTime when no explicit duration field exists
+  const duration = explicitDuration || computeDurationFromDates(startTime, endTime);
 
   return {
     id: raw.Id?.toString() || raw.RecordingId?.toString() || raw.RecId?.toString() || "",
@@ -155,6 +142,14 @@ function formatDateTimeBoundary(value: string, boundary: "start" | "end"): strin
   const text = String(value);
   if (text.includes("T")) return text;
   return `${text}${boundary === "start" ? "T00:00:00Z" : "T23:59:59Z"}`;
+}
+
+function computeDurationFromDates(start: string, end: string): number {
+  if (!start || !end) return 0;
+  const s = new Date(start).getTime();
+  const e = new Date(end).getTime();
+  if (Number.isNaN(s) || Number.isNaN(e)) return 0;
+  return Math.max(0, Math.round((e - s) / 1000));
 }
 
 function addSecondsToDate(value: string, seconds: number): string {

@@ -67,7 +67,9 @@ GET /health
 GET /api/calls/history?startDate=2026-04-01&endDate=2026-04-20&page=1&pageSize=50
 ```
 
-Parametres optionnels : `startDate`, `endDate`, `caller`, `callee`, `status`, `page`, `pageSize` (max 500).
+Parametres optionnels : `startDate`, `endDate`, `caller`, `callee`, `status`, `phone`, `driverId`, `startTime`, `endTime`, `sortBy`, `sortOrder`, `page`, `pageSize` (max 500).
+
+Tri : `sortBy` accepte `date`, `caller`, `callee`, `duration`, `status`. `sortOrder` accepte `asc` ou `desc`.
 
 #### Liste complete
 
@@ -95,7 +97,9 @@ GET /api/calls/active
 GET /api/recordings?startDate=2026-04-01&endDate=2026-04-20&page=1&pageSize=20
 ```
 
-Parametres optionnels : `startDate`, `endDate`, `caller`, `callee`, `page`, `pageSize` (max 500).
+Parametres optionnels : `startDate`, `endDate`, `caller`, `callee`, `phone`, `sortBy`, `sortOrder`, `page`, `pageSize` (max 500).
+
+Tri : `sortBy` accepte `date`, `caller`, `callee`, `duration`. `sortOrder` accepte `asc` ou `desc`. Le filtrage par caller/callee/phone est effectue cote serveur (client-side filtering) car l'API OData 3CX ne supporte pas `contains()`.
 
 #### Telecharger un enregistrement
 
@@ -196,6 +200,11 @@ src/
     calls.ts            Historique et appels actifs
     recordings.ts       Enregistrements
     system.ts           Statut et extensions
+  module/
+    index.ts            Module 3CX integre (auth, HTTP client)
+    services/
+      CallHistory.ts    Service historique d'appels
+      Recordings.ts     Service enregistrements
   types/
-    3cx-module.d.ts     Declarations TypeScript pour @omniyat/3cx-module
+    i3cx-module.ts      Interface du module 3CX
 ```

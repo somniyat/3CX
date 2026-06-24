@@ -1,11 +1,14 @@
 import { useMemo, useRef, useState } from 'react';
-import { Download, FileText, Filter, Pause, Play } from 'lucide-react';
+import { ArrowDown, ArrowUp, ArrowUpDown, Download, Filter, Pause, Play } from 'lucide-react';
 import { downloadRecording, getRecordingAudioUrl, getRecordings, type Recording } from '../api';
 import { useFetch } from '../hooks/useFetch';
 import Loader from '../components/Loader';
 import ErrorMessage from '../components/ErrorMessage';
 
 const PAGE_SIZE = 50;
+
+type SortField = 'date' | 'caller' | 'callee' | 'duration';
+type SortOrder = 'asc' | 'desc';
 
 type Filters = {
   startDate: string;
@@ -36,12 +39,35 @@ export default function Recordings() {
   const [page, setPage] = useState(1);
   const [playingId, setPlayingId] = useState<string | null>(null);
   const [filters, setFilters] = useState<Filters>({ startDate: '', endDate: '', caller: '', callee: '', phone: '', transcribed: '' });
+  const [sortBy, setSortBy] = useState<SortField | ''>('');
+  const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
   const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  const toggleSort = (field: SortField) => {
+    setPage(1);
+    if (sortBy === field) {
+      setSortOrder((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortBy(field);
+      setSortOrder(field === 'date' ? 'desc' : 'asc');
+    }
+  };
+
+  const SortIcon = ({ field }: { field: SortField }) => {
+    if (sortBy !== field) return <ArrowUpDown size={14} className="sort-icon sort-icon--inactive" />;
+    return sortOrder === 'asc'
+      ? <ArrowUp size={14} className="sort-icon sort-icon--active" />
+      : <ArrowDown size={14} className="sort-icon sort-icon--active" />;
+  };
 
   const params = useMemo(() => {
     const entries = Object.entries(filters).filter(([, value]) => value);
-    return Object.fromEntries([...entries, ['page', String(page)], ['pageSize', String(PAGE_SIZE)]]) as Record<string, string>;
-  }, [filters, page]);
+    const all: [string, string][] = [...entries, ['page', String(page)], ['pageSize', String(PAGE_SIZE)]];
+    if (sortBy) {
+      all.push(['sortBy', sortBy], ['sortOrder', sortOrder]);
+    }
+    return Object.fromEntries(all) as Record<string, string>;
+  }, [filters, page, sortBy, sortOrder]);
 
   const { data, loading, error } = useFetch(() => getRecordings(params), [params]);
   const rows = data?.list ?? [];
@@ -90,14 +116,6 @@ export default function Recordings() {
           <label>Appelant <input placeholder="chauffeur" value={filters.caller} onChange={(e) => updateFilter('caller', e.target.value)} /></label>
           <label>Appelé <input placeholder="client" value={filters.callee} onChange={(e) => updateFilter('callee', e.target.value)} /></label>
           <label>Téléphone <input placeholder="chauffeur ou client" value={filters.phone} onChange={(e) => updateFilter('phone', e.target.value)} /></label>
-          <label>
-            Transcript
-            <select value={filters.transcribed} onChange={(e) => updateFilter('transcribed', e.target.value)}>
-              <option value="">Tous</option>
-              <option value="true">Disponible</option>
-              <option value="false">Non disponible</option>
-            </select>
-          </label>
           <button className="btn" onClick={() => { setPage(1); setFilters({ startDate: '', endDate: '', caller: '', callee: '', phone: '', transcribed: '' }); }}>
             Réinitialiser
           </button>
@@ -114,18 +132,15 @@ export default function Recordings() {
           <table className="table recordings-table">
             <thead>
               <tr>
-                <th>Date</th>
-                <th>Appelant</th>
-                <th>Appelé</th>
-                <th>Durée</th>
+                <th className="sortable-th" onClick={() => toggleSort('date')}>Date <SortIcon field="date" /></th>
+                <th className="sortable-th" onClick={() => toggleSort('caller')}>Appelant <SortIcon field="caller" /></th>
+                <th className="sortable-th" onClick={() => toggleSort('callee')}>Appelé <SortIcon field="callee" /></th>
+                <th className="sortable-th" onClick={() => toggleSort('duration')}>Durée <SortIcon field="duration" /></th>
                 <th>Audio</th>
-                <th>Transcription relative</th>
               </tr>
             </thead>
             <tbody>
-              {rows.map((rec, i) => {
-                const transcript = (rec.transcription || '').trim();
-                return (
+              {rows.map((rec, i) => (
                   <tr key={rec.id ?? i}>
                     <td>{formatDate(rec.startTime || String(rec.date || ''))}</td>
                     <td>{participant(rec.caller, rec.callerName)}</td>
@@ -142,20 +157,8 @@ export default function Recordings() {
                         </button>
                       </div>
                     </td>
-                    <td className="transcript-cell wide">
-                      {transcript ? (
-                        <details open={rows.length <= 5}>
-                          <summary><FileText size={14} /> Voir le transcript</summary>
-                          {rec.summary && <p className="transcript-summary"><strong>Résumé :</strong> {rec.summary}</p>}
-                          <p>{transcript}</p>
-                        </details>
-                      ) : (
-                        <span className="muted">Transcript pas encore disponible</span>
-                      )}
-                    </td>
                   </tr>
-                );
-              })}
+              ))}
             </tbody>
           </table>
           </div>

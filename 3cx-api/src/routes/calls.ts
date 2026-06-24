@@ -2,6 +2,9 @@ import { Router, type Request, type Response } from "express";
 import { z } from "zod";
 import type { CallRecord, Driver, I3CXModule, Recording, Transcription } from "../types/i3cx-module";
 
+const SORTABLE_FIELDS = ["date", "caller", "callee", "duration", "status"] as const;
+type SortField = (typeof SORTABLE_FIELDS)[number];
+
 const historyQuerySchema = z.object({
   startDate: z.string().optional(),
   endDate: z.string().optional(),
@@ -12,6 +15,8 @@ const historyQuerySchema = z.object({
   phone: z.string().optional(),
   driverId: z.string().optional(),
   status: z.string().optional(),
+  sortBy: z.enum(SORTABLE_FIELDS).optional(),
+  sortOrder: z.enum(["asc", "desc"]).optional(),
   page: z.coerce.number().int().positive().optional(),
   pageSize: z.coerce.number().int().positive().max(500).optional(),
 });
@@ -71,6 +76,45 @@ function filterCalls(calls: CallRecord[], query: HistoryQuery, driver?: Driver |
     if (minute !== null && startMinute !== null && minute < startMinute) return false;
     if (minute !== null && endMinute !== null && minute > endMinute) return false;
     return true;
+  });
+}
+
+function str(v: unknown): string { return String(v ?? ""); }
+function num(v: unknown): number { return typeof v === "number" ? v : 0; }
+
+function sortCalls(calls: CallRecord[], sortBy?: SortField, sortOrder: "asc" | "desc" = "asc"): CallRecord[] {
+  if (!sortBy) return calls;
+  const dir = sortOrder === "desc" ? -1 : 1;
+  return [...calls].sort((a, b) => {
+    let va: string | number;
+    let vb: string | number;
+    switch (sortBy) {
+      case "date":
+        va = str(a.startTime);
+        vb = str(b.startTime);
+        break;
+      case "caller":
+        va = str(a.callerName || a.caller).toLowerCase();
+        vb = str(b.callerName || b.caller).toLowerCase();
+        break;
+      case "callee":
+        va = str(a.calleeName || a.callee).toLowerCase();
+        vb = str(b.calleeName || b.callee).toLowerCase();
+        break;
+      case "duration":
+        va = num(a.duration);
+        vb = num(b.duration);
+        break;
+      case "status":
+        va = str(a.status);
+        vb = str(b.status);
+        break;
+      default:
+        return 0;
+    }
+    if (va < vb) return -1 * dir;
+    if (va > vb) return 1 * dir;
+    return 0;
   });
 }
 
@@ -154,7 +198,8 @@ export function createCallsRouter(injectedModule?: I3CXModule): Router {
       const driver = await getDriverFromQuery(module, query);
       const data = normalizePaginated(await module.getCallHistory(query) as PaginatedLike<CallRecord>);
       const filtered = filterCalls(data.list, query, driver);
-      const enriched = await enrichCalls(module, filtered, query, driver);
+      const sorted = sortCalls(filtered, query.sortBy, query.sortOrder);
+      const enriched = await enrichCalls(module, sorted, query, driver);
       res.json({ list: enriched, totalCount: query.phone || query.driverId || query.startTime || query.endTime || query.status ? enriched.length : data.totalCount, data: enriched, total: enriched.length });
     } catch (err: any) {
       const status = err.response?.status;
