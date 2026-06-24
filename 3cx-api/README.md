@@ -111,6 +111,32 @@ Retourne un flux audio (`audio/mpeg`).
 
 ---
 
+### Utilisateurs
+
+#### Liste paginee
+
+```
+GET /api/users?page=1&pageSize=50
+```
+
+Parametres optionnels : `page`, `pageSize` (max 200), `search` (recherche par nom, prenom, extension ou email), `enabledOnly` (boolean).
+
+Reponse :
+
+```json
+{
+  "items": [
+    { "id": 1, "extension": "100", "fullName": "Jean Dupont", "firstName": "Jean", "lastName": "Dupont", "email": "jean@exemple.ch", "mobile": "+41791234567", "enabled": true, "internal": true }
+  ],
+  "total": 42,
+  "page": 1,
+  "pageSize": 50,
+  "totalPages": 1
+}
+```
+
+---
+
 ### Systeme
 
 #### Statut
@@ -124,6 +150,8 @@ GET /api/system/status
 ```
 GET /api/system/extensions
 ```
+
+Retourne la liste des extensions avec id, numero, nom, email et statut.
 
 ---
 
@@ -149,6 +177,10 @@ curl -H "x-api-key: votre-cle-api-secrete" \
 curl -H "x-api-key: votre-cle-api-secrete" \
   -o recording.mp3 \
   http://localhost:3000/api/recordings/abc123/download
+
+# Utilisateurs (liste paginee avec recherche)
+curl -H "x-api-key: votre-cle-api-secrete" \
+  "http://localhost:3000/api/users?search=dupont&page=1&pageSize=20"
 
 # Extensions
 curl -H "x-api-key: votre-cle-api-secrete" \
@@ -176,6 +208,10 @@ console.log(data);
 const active = await fetch(`${API_URL}/api/calls/active`, { headers });
 console.log(await active.json());
 
+// Utilisateurs
+const users = await fetch(`${API_URL}/api/users?search=dupont`, { headers });
+console.log(await users.json());
+
 // Extensions
 const extensions = await fetch(`${API_URL}/api/system/extensions`, { headers });
 console.log(await extensions.json());
@@ -199,12 +235,14 @@ src/
     health.ts           GET /health
     calls.ts            Historique et appels actifs
     recordings.ts       Enregistrements
+    users.ts            Utilisateurs 3CX
     system.ts           Statut et extensions
   module/
     index.ts            Module 3CX integre (auth, HTTP client)
     services/
       CallHistory.ts    Service historique d'appels
       Recordings.ts     Service enregistrements
+      System.ts         Extensions, utilisateurs, statut, appels actifs
   types/
     i3cx-module.ts      Interface du module 3CX
 ```
