@@ -73,7 +73,7 @@ function filterCalls(calls: CallRecord[], query: HistoryQuery, driver?: Driver |
   return calls.filter((call) => {
     if (query.status && call.status !== query.status) return false;
     if (phone && !includesPhone(call.caller, phone) && !includesPhone(call.callee, phone)) return false;
-    if (ext && !includesPhone(call.caller, ext) && !includesPhone(call.callee, ext)) return false;
+    if (ext && String(call.srcDn || "") !== ext && String(call.dstDn || "") !== ext) return false;
     if (driverNeedles.length && !driverNeedles.some((value) => includesPhone(call.caller, value) || includesPhone(call.callee, value))) return false;
 
     const minute = callMinute(call);

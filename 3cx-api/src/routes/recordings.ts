@@ -11,12 +11,16 @@ const listQuerySchema = z.object({
   caller: z.string().optional(),
   callee: z.string().optional(),
   phone: z.string().optional(),
+  extension: z.string().optional(),
+  userId: z.coerce.number().int().positive().optional(),
   transcribed: z.enum(["true", "false"]).optional(),
   sortBy: z.enum(SORTABLE_FIELDS).optional(),
   sortOrder: z.enum(["asc", "desc"]).optional(),
   page: z.coerce.number().int().positive().optional(),
   pageSize: z.coerce.number().int().positive().max(500).optional(),
 });
+
+type ListQuery = z.infer<typeof listQuerySchema>;
 
 type PaginatedLike<T> = { list?: T[]; totalCount?: number; data?: T[]; total?: number };
 
@@ -70,15 +74,29 @@ function sortRecordings(recordings: Recording[], sortBy?: SortField, sortOrder: 
   });
 }
 
-function filterRecordings(recordings: Recording[], query: z.infer<typeof listQuerySchema>) {
+function matchesExtension(recording: Recording, ext: string): boolean {
+  return String(recording.caller || "") === ext || String(recording.callee || "") === ext;
+}
+
+function filterRecordings(recordings: Recording[], query: ListQuery) {
   return recordings.filter((recording) => {
     if (query.phone && !includesPhone(recording.caller, query.phone) && !includesPhone(recording.callee, query.phone)) return false;
+    if (query.extension && !matchesExtension(recording, query.extension)) return false;
     if (query.caller && !includesPhone(recording.caller, query.caller) && !String(recording.callerName || "").toLowerCase().includes(query.caller.toLowerCase())) return false;
     if (query.callee && !includesPhone(recording.callee, query.callee) && !String(recording.calleeName || "").toLowerCase().includes(query.callee.toLowerCase())) return false;
     if (query.transcribed === "true" && !recording.isTranscribed && !recording.transcription) return false;
     if (query.transcribed === "false" && (recording.isTranscribed || recording.transcription)) return false;
     return true;
   });
+}
+
+async function resolveExtensionFromUserId(module: I3CXModule, query: ListQuery): Promise<ListQuery> {
+  if (!query.userId) return query;
+  const user = await module.getUserById(query.userId);
+  if (user?.extension) {
+    return { ...query, extension: user.extension };
+  }
+  return query;
 }
 
 export function createRecordingsRouter(injectedModule?: I3CXModule): Router {
@@ -92,14 +110,16 @@ export function createRecordingsRouter(injectedModule?: I3CXModule): Router {
       res.status(400).json({ error: "Paramètres invalides", details: parsed.error.flatten().fieldErrors });
       return;
     }
-    const { caller, callee, phone, transcribed, sortBy, sortOrder, page, pageSize, ...dateParams } = parsed.data;
-    const needsClientFilter = Boolean(caller || callee || phone || transcribed);
+    const module = m(req);
+    const query = await resolveExtensionFromUserId(module, parsed.data);
+    const { caller, callee, phone, extension, transcribed, sortBy, sortOrder, page, pageSize, ...dateParams } = query;
+    const needsClientFilter = Boolean(caller || callee || phone || extension || transcribed);
 
     if (needsClientFilter || sortBy) {
       // Fetch a large batch so client-side filtering/sorting has enough candidates
       const apiParams = { ...dateParams, page: 1, pageSize: 500 };
-      const data = normalizePaginated(await m(req).getRecordings(apiParams as any) as PaginatedLike<Recording>);
-      const filtered = filterRecordings(data.list, parsed.data);
+      const data = normalizePaginated(await module.getRecordings(apiParams as any) as PaginatedLike<Recording>);
+      const filtered = filterRecordings(data.list, query);
       const sorted = sortRecordings(filtered, sortBy, sortOrder);
       const p = page || 1;
       const ps = pageSize || 50;
@@ -107,7 +127,7 @@ export function createRecordingsRouter(injectedModule?: I3CXModule): Router {
       const list = sorted.slice(start, start + ps);
       res.json({ list, totalCount: filtered.length, data: list, total: filtered.length });
     } else {
-      const data = normalizePaginated(await m(req).getRecordings(parsed.data as any) as PaginatedLike<Recording>);
+      const data = normalizePaginated(await module.getRecordings(query as any) as PaginatedLike<Recording>);
       res.json({ list: data.list, totalCount: data.totalCount, data: data.list, total: data.totalCount });
     }
   });
