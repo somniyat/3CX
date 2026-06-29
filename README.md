@@ -162,6 +162,35 @@ Le endpoint principal. Accepte un body JSON :
 
 La correspondance des numeros est flexible : `+41791234567`, `0791234567`, `791234567` matcheront le meme numero.
 
+### `GET /api/calls/history`
+
+Historique pagine avec filtres en query params :
+
+| Parametre | Type | Description |
+|-----------|------|-------------|
+| `startDate` | `string` | Date de debut (ISO 8601 ou `YYYY-MM-DD`) |
+| `endDate` | `string` | Date de fin |
+| `startTime` | `string` | Heure de debut (`HH:MM`) |
+| `endTime` | `string` | Heure de fin (`HH:MM`) |
+| `caller` | `string` | Filtrer par appelant |
+| `callee` | `string` | Filtrer par appele |
+| `phone` | `string` | Filtrer par numero (appelant ou appele) |
+| `extension` | `string` | Filtrer par extension 3CX (match exact sur srcDn/dstDn) |
+| `userId` | `number` | Filtrer par ID utilisateur 3CX (resolu en extension) |
+| `driverId` | `string` | Filtrer par ID chauffeur |
+| `status` | `string` | Filtrer par statut (`answered`, `missed`) |
+| `sortBy` | `string` | Tri : `date`, `caller`, `callee`, `duration`, `status` |
+| `sortOrder` | `string` | Ordre : `asc` ou `desc` |
+| `page` | `number` | Page (defaut: 1) |
+| `pageSize` | `number` | Taille de page, max 500 |
+
+Exemple :
+
+```
+GET /api/calls/history?extension=598&startDate=2026-06-01&page=1&pageSize=50
+GET /api/calls/history?userId=179&startDate=2026-06-01
+```
+
 ### Enregistrements et transcriptions
 
 | Methode | Route | Description |
@@ -170,6 +199,32 @@ La correspondance des numeros est flexible : `+41791234567`, `0791234567`, `7912
 | `GET` | `/api/recordings/:id/download` | Telecharger un enregistrement audio |
 | `GET` | `/api/transcriptions` | Liste des transcriptions |
 | `GET` | `/api/transcriptions/:id` | Detail d'une transcription |
+
+### `GET /api/recordings`
+
+Liste des enregistrements avec filtres en query params :
+
+| Parametre | Type | Description |
+|-----------|------|-------------|
+| `startDate` | `string` | Date de debut (ISO 8601 ou `YYYY-MM-DD`) |
+| `endDate` | `string` | Date de fin |
+| `caller` | `string` | Filtrer par appelant (numero ou nom) |
+| `callee` | `string` | Filtrer par appele (numero ou nom) |
+| `phone` | `string` | Filtrer par numero (appelant ou appele) |
+| `extension` | `string` | Filtrer par extension 3CX (match exact sur caller/callee) |
+| `userId` | `number` | Filtrer par ID utilisateur 3CX (resolu en extension) |
+| `transcribed` | `string` | `true` ou `false` — filtrer par statut de transcription |
+| `sortBy` | `string` | Tri : `date`, `caller`, `callee`, `duration` |
+| `sortOrder` | `string` | Ordre : `asc` ou `desc` |
+| `page` | `number` | Page (defaut: 1) |
+| `pageSize` | `number` | Taille de page, max 500 |
+
+Exemple :
+
+```
+GET /api/recordings?extension=598&startDate=2026-06-01
+GET /api/recordings?userId=179&transcribed=true
+```
 
 ### Systeme et utilisateurs
 
