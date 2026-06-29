@@ -125,16 +125,24 @@ function sortCalls(calls: CallRecord[], sortBy?: SortField, sortOrder: "asc" | "
 function isCallLinkedToRecording(call: CallRecord, recording: Recording) {
   if (call.recordingId && String(call.recordingId) === String(recording.id)) return true;
   const callId = String(call.id || "");
-  if (callId && String(recording.callId || "") === callId) return true;
+  if (callId && callId !== "0" && callId !== "1" && String(recording.callId || "") === callId) return true;
+
+  // Match by parties: check caller/callee phone numbers AND srcDn/dstDn extensions
+  const srcDn = String(call.srcDn || "");
+  const dstDn = String(call.dstDn || "");
+  const recCaller = String(recording.caller || "");
+  const recCallee = String(recording.callee || "");
 
   const sameParties =
-    (includesPhone(recording.caller, call.caller) && includesPhone(recording.callee, call.callee)) ||
-    (includesPhone(recording.caller, call.callee) && includesPhone(recording.callee, call.caller));
+    (includesPhone(recCaller, call.caller) && includesPhone(recCallee, call.callee)) ||
+    (includesPhone(recCaller, call.callee) && includesPhone(recCallee, call.caller)) ||
+    (srcDn && (recCaller === srcDn || recCallee === srcDn)) ||
+    (dstDn && (recCaller === dstDn || recCallee === dstDn));
   if (!sameParties) return false;
 
   const callStart = new Date(call.startTime).getTime();
   const recordingStart = new Date(String(recording.startTime || recording.date || "")).getTime();
-  if (Number.isNaN(callStart) || Number.isNaN(recordingStart)) return true;
+  if (Number.isNaN(callStart) || Number.isNaN(recordingStart)) return false;
   return Math.abs(callStart - recordingStart) <= 5 * 60 * 1000;
 }
 
@@ -174,6 +182,7 @@ async function enrichCalls(module: I3CXModule, calls: CallRecord[], query: Histo
       caller: query.caller,
       callee: query.callee,
       phone: query.phone,
+      extension: query.extension,
       page: 1,
       pageSize: 500,
     } as any);

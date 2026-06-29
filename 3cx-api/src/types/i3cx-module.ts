@@ -52,6 +52,7 @@ export interface RecordingsOptions {
   caller?: string;
   callee?: string;
   phone?: string;
+  extension?: string;
   transcribed?: "true" | "false";
   page?: number;
   pageSize?: number;

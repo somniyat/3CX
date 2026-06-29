@@ -6,6 +6,7 @@ export interface RecordingsOptions {
   caller?: string;
   callee?: string;
   phone?: string;
+  extension?: string;
   transcribed?: string;
   page?: number;
   pageSize?: number;
@@ -41,15 +42,19 @@ export async function getRecordings(
     $orderby: "StartTime desc",
   };
 
-  // Only date filters are sent as OData $filter — caller/callee/phone/transcribed
-  // filtering is handled client-side because the 3CX OData API does not reliably
-  // support contains() on these fields.
+  // Date filters + extension filter are sent as OData $filter.
+  // caller/callee/phone/transcribed filtering is handled client-side because
+  // the 3CX OData API does not reliably support contains() on these fields.
   const filters: string[] = [];
   if (options.startDate) {
     filters.push(`StartTime ge ${formatDateTimeBoundary(options.startDate, "start")}`);
   }
   if (options.endDate) {
     filters.push(`StartTime le ${formatDateTimeBoundary(options.endDate, "end")}`);
+  }
+  if (options.extension) {
+    const ext = escapeOData(options.extension);
+    filters.push(`(FromCallerNumber eq '${ext}' or ToCallerNumber eq '${ext}')`);
   }
   if (filters.length) {
     params.$filter = filters.join(" and ");
