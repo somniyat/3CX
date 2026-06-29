@@ -149,6 +149,21 @@ export async function listUsers(
   };
 }
 
+export async function getUserById(
+  http: AxiosInstance,
+  userId: number,
+): Promise<AppUserInfo | null> {
+  try {
+    const { data } = await http.get(`/xapi/v1/Users`, {
+      params: { $filter: `Id eq ${userId}`, $top: 1 },
+    });
+    const raw = data.value?.[0];
+    return raw ? normalizeUser(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
 function normalizeUser(raw: any): AppUserInfo {
   return {
     id: raw.Id ?? 0,

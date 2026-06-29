@@ -15,6 +15,7 @@ export interface I3CXModule {
   getSystemStatus(): Promise<SystemStatus>;
   getExtensions(): Promise<Extension[]>;
   listUsers(options?: ListUsersOptions): Promise<UserListResult>;
+  getUserById(userId: number): Promise<AppUser | null>;
   runAccessAudit(): Promise<AccessAuditResult>;
 
   // ─── Chauffeurs (Controle Qualite) ─────────────────────────

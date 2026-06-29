@@ -3,7 +3,7 @@ import { authenticate, isTokenExpired } from "./services/Auth";
 import { getCallHistory, getAllCallHistory } from "./services/CallHistory";
 import { getRecordings, downloadRecording } from "./services/Recordings";
 import { getTranscription, getTranscriptions } from "./services/Transcriptions";
-import { getExtensions, getSystemStatus, getActiveCalls, listUsers } from "./services/System";
+import { getExtensions, getSystemStatus, getActiveCalls, listUsers, getUserById } from "./services/System";
 import {
   listDrivers,
   getDriver,
@@ -127,6 +127,11 @@ export class ThreeCXModule {
   async listUsers(options?: any) {
     this.#ensureInitialized();
     return listUsers(this.#http, options);
+  }
+
+  async getUserById(userId: number) {
+    this.#ensureInitialized();
+    return getUserById(this.#http, userId);
   }
 
   // ─── Chauffeurs (Controle Qualite) ─────────────────────────

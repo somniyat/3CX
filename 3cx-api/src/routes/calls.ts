@@ -14,6 +14,8 @@ const historyQuerySchema = z.object({
   callee: z.string().optional(),
   phone: z.string().optional(),
   driverId: z.string().optional(),
+  extension: z.string().optional(),
+  userId: z.coerce.number().int().positive().optional(),
   status: z.string().optional(),
   sortBy: z.enum(SORTABLE_FIELDS).optional(),
   sortOrder: z.enum(["asc", "desc"]).optional(),
@@ -63,6 +65,7 @@ function callMinute(call: CallRecord) {
 
 function filterCalls(calls: CallRecord[], query: HistoryQuery, driver?: Driver | null) {
   const phone = query.phone;
+  const ext = query.extension;
   const startMinute = timeToMinutes(query.startTime);
   const endMinute = timeToMinutes(query.endTime);
   const driverNeedles = driver ? [driver.extension, driver.phone].filter(Boolean) as string[] : [];
@@ -70,6 +73,7 @@ function filterCalls(calls: CallRecord[], query: HistoryQuery, driver?: Driver |
   return calls.filter((call) => {
     if (query.status && call.status !== query.status) return false;
     if (phone && !includesPhone(call.caller, phone) && !includesPhone(call.callee, phone)) return false;
+    if (ext && !includesPhone(call.caller, ext) && !includesPhone(call.callee, ext)) return false;
     if (driverNeedles.length && !driverNeedles.some((value) => includesPhone(call.caller, value) || includesPhone(call.callee, value))) return false;
 
     const minute = callMinute(call);
@@ -152,6 +156,15 @@ async function getDriverFromQuery(module: I3CXModule, query: HistoryQuery) {
   return module.getDriver(query.driverId).catch(() => null);
 }
 
+async function resolveExtensionFromUserId(module: I3CXModule, query: HistoryQuery): Promise<HistoryQuery> {
+  if (!query.userId) return query;
+  const user = await module.getUserById(query.userId);
+  if (user?.extension) {
+    return { ...query, extension: user.extension };
+  }
+  return query;
+}
+
 async function enrichCalls(module: I3CXModule, calls: CallRecord[], query: HistoryQuery, driver?: Driver | null) {
   let recordings: Recording[] = [];
   try {
@@ -194,13 +207,14 @@ export function createCallsRouter(injectedModule?: I3CXModule): Router {
     }
     try {
       const module = m(req);
-      const query = parsed.data;
+      const query = await resolveExtensionFromUserId(module, parsed.data);
       const driver = await getDriverFromQuery(module, query);
       const data = normalizePaginated(await module.getCallHistory(query) as PaginatedLike<CallRecord>);
       const filtered = filterCalls(data.list, query, driver);
       const sorted = sortCalls(filtered, query.sortBy, query.sortOrder);
       const enriched = await enrichCalls(module, sorted, query, driver);
-      res.json({ list: enriched, totalCount: query.phone || query.driverId || query.startTime || query.endTime || query.status ? enriched.length : data.totalCount, data: enriched, total: enriched.length });
+      const hasClientFilter = query.phone || query.driverId || query.extension || query.startTime || query.endTime || query.status;
+      res.json({ list: enriched, totalCount: hasClientFilter ? enriched.length : data.totalCount, data: enriched, total: enriched.length });
     } catch (err: any) {
       const status = err.response?.status;
       if (status === 403) {
